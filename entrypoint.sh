@@ -2,13 +2,17 @@
 set -eo pipefail
 
 main() {
+
   PR_REF="${GITHUB_REF%/merge}/head"
-  BASE_REF="${GITHUB_BASE_REF}"
 
-  echo "Current ref: ${PR_REF}"
-  echo "Base ref: ${BASE_REF}"
+  if [[ "$GITHUB_REF" == "refs/heads/gh-readonly-queue/"* ]]; then
+    # Merge queue event
+    PR_REF="${GITHUB_REF}"
+  fi
 
-  if [[ "$PR_REF" != "refs/pull/"* ]]; then
+  BASE_REF="${GITHUB_BASE_REF:-main}"
+
+  if [[ "$PR_REF" != "refs/pull/"* && "$PR_REF" != "refs/heads/gh-readonly-queue/"* ]]; then
     echo "This check works only with pull_request events"
     exit 1
   fi
@@ -18,6 +22,7 @@ main() {
   /usr/bin/git -c protocol.version=2 fetch --no-tags --prune --progress --no-recurse-submodules --depth=1 origin "${BASE_REF}:__ci_base"
   /usr/bin/git -c protocol.version=2 fetch --no-tags --prune --progress --no-recurse-submodules --shallow-exclude="${BASE_REF}" origin "${PR_REF}:__ci_pr"
   # Get the list before the "|| true" to fail the script when the git cmd fails.
+
   COMMIT_LIST=`/usr/bin/git log --pretty=format:%s __ci_base..__ci_pr`
 
   FIXUP_COUNT=`echo $COMMIT_LIST | grep fixup! | wc -l || true`
